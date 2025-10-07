@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import subprocess
 import os
+import sys
 import pathlib
 import sqlite3
 import glob
@@ -305,12 +306,15 @@ class CYTGui:
         self.log_message("")
         
     def log_message(self, message):
-        """Add message to log with timestamp"""
+        """Add message to log with timestamp (thread-safe)"""
         timestamp = datetime.now().strftime("[%H:%M:%S]")
         full_message = f"{timestamp} {message}\n"
+        # Always schedule UI updates on the main thread
+        self.root.after(0, self._append_log_message, full_message)
+
+    def _append_log_message(self, full_message: str):
         self.log_text.insert(tk.END, full_message)
         self.log_text.see(tk.END)
-        self.root.update_idletasks()
         
     def update_status(self):
         """Update status indicators"""
@@ -318,17 +322,21 @@ class CYTGui:
         
     def _update_status_background(self):
         """Background status update"""
+        # Helper to update labels from any thread
+        def _set_label(label, text, color):
+            self.root.after(0, lambda: label.config(text=text, fg=color))
+
         # Check Kismet
         kismet_running = self.check_kismet_running()
         if kismet_running:
-            self.kismet_status.config(text="✅ Kismet: Running", fg='#28a745')
+            _set_label(self.kismet_status, "✅ Kismet: Running", '#28a745')
         else:
-            self.kismet_status.config(text="❌ Kismet: Not Running", fg='#dc3545')
+            _set_label(self.kismet_status, "❌ Kismet: Not Running", '#dc3545')
             
         # Check database
         db_file, db_error = self.check_kismet_db()
         if db_error:
-            self.db_status.config(text="❌ Database: Error", fg='#dc3545')
+            _set_label(self.db_status, "❌ Database: Error", '#dc3545')
         else:
             # Get device count
             try:
@@ -336,22 +344,22 @@ class CYTGui:
                     cursor = con.cursor()
                     cursor.execute("SELECT COUNT(*) FROM devices")
                     count = cursor.fetchone()[0]
-                self.db_status.config(text=f"✅ Database: {count:,} devices", fg='#28a745')
-            except:
-                self.db_status.config(text="⚠️ Database: Connected", fg='#ffaa00')
+                _set_label(self.db_status, f"✅ Database: {count:,} devices", '#28a745')
+            except Exception:
+                _set_label(self.db_status, "⚠️ Database: Connected", '#ffaa00')
                 
         # Check credentials
         if self.credential_manager:
             try:
                 token = self.credential_manager.get_wigle_token()
                 if token:
-                    self.creds_status.config(text="✅ Credentials: Encrypted", fg='#28a745')
+                    _set_label(self.creds_status, "✅ Credentials: Encrypted", '#28a745')
                 else:
-                    self.creds_status.config(text="⚠️ Credentials: Missing", fg='#ffaa00')
-            except:
-                self.creds_status.config(text="❌ Credentials: Error", fg='#dc3545')
+                    _set_label(self.creds_status, "⚠️ Credentials: Missing", '#ffaa00')
+            except Exception:
+                _set_label(self.creds_status, "❌ Credentials: Error", '#dc3545')
         else:
-            self.creds_status.config(text="⚠️ Credentials: Optional", fg='#ffaa00')
+            _set_label(self.creds_status, "⚠️ Credentials: Optional", '#ffaa00')
             
     def check_kismet_running(self):
         """Check if Kismet is running"""
@@ -400,15 +408,18 @@ class CYTGui:
             else:
                 self.log_message("❌ Kismet is not running")
             
-            # Check monitor mode
-            try:
-                iwconfig_result = subprocess.run(['iwconfig'], capture_output=True, text=True, timeout=5)
-                if "Mode:Monitor" in iwconfig_result.stdout:
-                    self.log_message("✅ Monitor mode detected")
-                else:
-                    self.log_message("❌ Monitor mode not detected")
-            except Exception as e:
-                self.log_message(f"⚠️ Could not check monitor mode: {e}")
+            # Check monitor mode (Linux only)
+            if sys.platform.startswith('linux'):
+                try:
+                    iwconfig_result = subprocess.run(['iwconfig'], capture_output=True, text=True, timeout=5)
+                    if "Mode:Monitor" in iwconfig_result.stdout:
+                        self.log_message("✅ Monitor mode detected")
+                    else:
+                        self.log_message("❌ Monitor mode not detected")
+                except Exception as e:
+                    self.log_message(f"⚠️ Could not check monitor mode: {e}")
+            else:
+                self.log_message("ℹ️ Monitor mode check skipped (non-Linux platform)")
                 
             self.update_status()
         except Exception as e:
