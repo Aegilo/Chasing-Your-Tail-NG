@@ -1,0 +1,25 @@
+[tool.pytest.ini_options]
+addopts = "-q -ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+# Keep initial checks minimal to avoid churn in PR1; expand in follow-ups
+select = ["E", "F", "W", "I"]
+# Target modern Python without enforcing upgrades yet
+target-version = "py311"
+exclude = [
+  "legacy",
+  "old_scripts",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict_optional = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+no_site_packages = true
+namespace_packages = true
+# Lenient initial adoption; tighten in later PRs
+disallow_untyped_defs = false
+check_untyped_defs = false
