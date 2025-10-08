@@ -251,7 +251,7 @@ class SurveillanceAnalyzer:
         print(f"📊 Analysis Results:")
         print(f"   Total Devices: {results['total_devices']:,}")
         print(f"   Suspicious Devices: {results['suspicious_devices']}")
-        print(f"   High Threat: {results['high_threat_devices']}")
+        print(f"   High Threat: {results['high_persistence_devices']}")
         print(f"   Multi-Location Devices: {results['multi_location_devices']}")
         print(f"   Location Sessions: {results['location_sessions']}")
         print(f"\\n📁 Generated Files:")
