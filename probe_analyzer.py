@@ -229,8 +229,20 @@ def main():
         print(f"Last seen: {result['last_seen']}")
         
         # Calculate time span
-        first = datetime.strptime(result['first_seen'], '%m-%d-%y %H:%M:%S')
-        last = datetime.strptime(result['last_seen'], '%m-%d-%y %H:%M:%S')
+        def _parse_ts(ts: str):
+            for fmt in ('%Y-%m-%d %H:%M:%S', '%m-%d-%y %H:%M:%S'):
+                try:
+                    return datetime.strptime(ts, fmt)
+                except ValueError:
+                    continue
+            # Fallback: try ISO-like formats
+            try:
+                return datetime.fromisoformat(ts.replace('Z', ''))
+            except Exception:
+                raise ValueError(f"Unrecognized timestamp format: {ts}")
+
+        first = _parse_ts(result['first_seen'])
+        last = _parse_ts(result['last_seen'])
         duration = last - first
         if duration.total_seconds() > 0:
             print(f"Time span: {duration}")
